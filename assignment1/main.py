@@ -1,112 +1,87 @@
-# Import necessary libraries
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
 
-# Step 1: Load the dataset
-# Assuming the dataset is in a CSV file named 'cpu_performance.csv'
-df = pd.read_csv('cpu_performance.csv')
+# Load dataset
+data_path = './machine.data'
+columns = ['Vendor', 'Model', 'MYCT', 'MMIN', 'MMAX', 'CACH', 'CHMIN', 'CHMAX', 'PRP', 'ERP']
+df = pd.read_csv(data_path, names=columns, header=None)
 
-# Step 2: Data Preprocessing
-# Separate features and target variable
-X = df.drop(columns=['PRP', 'ERP', 'Vendor Name', 'Model Name'])  # Drop non-predictive and target variables
-y = df['PRP']  # Target variable
+# Drop non-predictive columns
+df.drop(columns=['Model', 'ERP'], inplace=True)
 
-# Split the dataset into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Preprocessing
+categorical_features = ['Vendor']
+numeric_features = ['MYCT', 'MMIN', 'MMAX', 'CACH', 'CHMIN', 'CHMAX']
 
-# Preprocessing for numerical features
-numerical_features = X.select_dtypes(include=['int64', 'float64']).columns
-numerical_transformer = StandardScaler()
+ohe = OneHotEncoder(handle_unknown='ignore')
+scaler = StandardScaler()
 
-# Preprocessing for categorical features
-categorical_features = X.select_dtypes(include=['object']).columns
-categorical_transformer = OneHotEncoder(handle_unknown='ignore')
-
-# Combine preprocessing steps
-preprocessor = ColumnTransformer(
-    transformers=[
-        ('num', numerical_transformer, numerical_features),
-        ('cat', categorical_transformer, categorical_features)
-    ])
-
-# Step 3: Model Development
-# Define the model
-model = Sequential([
-    Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
-    Dense(32, activation='relu'),
-    Dense(1)  # Output layer for regression
+preprocessor = ColumnTransformer([
+    ('num', scaler, numeric_features),
+    ('cat', ohe, categorical_features)
 ])
 
-# Compile the model
-model.compile(optimizer='adam', loss='mean_squared_error')
+# Splitting data
+X = df.drop(columns=['PRP'])
+y = df['PRP']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Create a pipeline that includes preprocessing and the model
-pipeline = Pipeline(steps=[('preprocessor', preprocessor),
-                           ('model', model)])
+# Preprocess data
+X_train = preprocessor.fit_transform(X_train)
+X_test = preprocessor.transform(X_test)
 
-# Step 4: Train the Model
-pipeline.fit(X_train, y_train, epochs=100, batch_size=32, validation_split=0.2)
+# Build neural network model
+model = Sequential([
+    Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
+    Dropout(0.2),
+    Dense(32, activation='relu'),
+    Dropout(0.2),
+    Dense(1)  # Regression output
+])
 
-# Step 5: Evaluate the Model
-# Predict on the test set
-y_pred = pipeline.predict(X_test)
+model.compile(optimizer=keras.optimizers.Adam(learning_rate=0.001),
+              loss='mse',
+              metrics=['mae'])
 
-# Calculate evaluation metrics
+# Train model
+history = model.fit(X_train, y_train, validation_split=0.2, epochs=100, batch_size=16, verbose=1)
+
+# Evaluate model
+y_pred = model.predict(X_test).flatten()
+
 mae = mean_absolute_error(y_test, y_pred)
 mse = mean_squared_error(y_test, y_pred)
 r2 = r2_score(y_test, y_pred)
 
-print(f'Mean Absolute Error (MAE): {mae}')
-print(f'Mean Squared Error (MSE): {mse}')
-print(f'R-squared (R2): {r2}')
+print(f'MAE: {mae:.2f}')
+print(f'MSE: {mse:.2f}')
+print(f'R2 Score: {r2:.2f}')
 
-# Step 6: Hyperparameter Tuning
-# You can experiment with different hyperparameters such as the number of layers, neurons, learning rate, etc.
-# For example, you can try adding more layers or changing the activation functions.
+# Plot training history
+plt.figure(figsize=(8, 6))
+plt.plot(history.history['mae'], label='Train MAE')
+plt.plot(history.history['val_mae'], label='Validation MAE')
+plt.xlabel("Epochs")
+plt.ylabel("Mean Absolute Error")
+plt.legend()
+plt.title("Training History")
+plt.show()
 
-# Example of a more complex model
-complex_model = Sequential([
-    Dense(128, activation='relu', input_shape=(X_train.shape[1],)),
-    Dense(64, activation='relu'),
-    Dense(32, activation='relu'),
-    Dense(1)
-])
-
-complex_model.compile(optimizer='adam', loss='mean_squared_error')
-
-complex_pipeline = Pipeline(steps=[('preprocessor', preprocessor),
-                                   ('model', complex_model)])
-
-complex_pipeline.fit(X_train, y_train, epochs=100, batch_size=32, validation_split=0.2)
-
-# Evaluate the complex model
-y_pred_complex = complex_pipeline.predict(X_test)
-
-mae_complex = mean_absolute_error(y_test, y_pred_complex)
-mse_complex = mean_squared_error(y_test, y_pred_complex)
-r2_complex = r2_score(y_test, y_pred_complex)
-
-print(f'Complex Model - Mean Absolute Error (MAE): {mae_complex}')
-print(f'Complex Model - Mean Squared Error (MSE): {mse_complex}')
-print(f'Complex Model - R-squared (R2): {r2_complex}')
-
-# Step 7: Submission
-# Save the model and the evaluation metrics for submission
-complex_model.save('cpu_performance_model.h5')
-
-# Save the evaluation metrics to a text file
-with open('evaluation_metrics.txt', 'w') as f:
-    f.write(f'Mean Absolute Error (MAE): {mae}\n')
-    f.write(f'Mean Squared Error (MSE): {mse}\n')
-    f.write(f'R-squared (R2): {r2}\n')
-    f.write(f'Complex Model - Mean Absolute Error (MAE): {mae_complex}\n')
-    f.write(f'Complex Model - Mean Squared Error (MSE): {mse_complex}\n')
-    f.write(f'Complex Model - R-squared (R2): {r2_complex}\n')
+# Plot actual vs predicted
+plt.figure(figsize=(8, 6))
+sns.scatterplot(x=y_test, y=y_pred)
+plt.xlabel("Actual PRP")
+plt.ylabel("Predicted PRP")
+plt.title("Actual vs Predicted Relative CPU Performance")
+plt.show()
