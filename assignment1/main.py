@@ -12,15 +12,11 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-# Load dataset
 data_path = './machine.data'
 columns = ['Vendor', 'Model', 'MYCT', 'MMIN', 'MMAX', 'CACH', 'CHMIN', 'CHMAX', 'PRP', 'ERP']
 df = pd.read_csv(data_path, names=columns, header=None)
-
-# Drop non-predictive columns
 df.drop(columns=['Model', 'ERP'], inplace=True)
 
-# Preprocessing
 categorical_features = ['Vendor']
 numeric_features = ['MYCT', 'MMIN', 'MMAX', 'CACH', 'CHMIN', 'CHMAX']
 
@@ -38,6 +34,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 
 X_train = preprocessor.fit_transform(X_train)
 X_test = preprocessor.transform(X_test)
+
 
 '''
 # layers
@@ -72,8 +69,8 @@ for layer in layer_count:
     print(f'MAE: {mae:.2f}')
     print(f'MSE: {mse:.2f}')
     print(f'R2 Score: {r2:.2f}')
-
-
+'''
+'''
 # units per layer
 feature_sizes = [64, 128, 256]
 feature_histories = []
@@ -119,7 +116,7 @@ for lr in learning_rates:
             Dropout(0.2),
             Dense(256, activation='relu'),
             Dropout(0.2),
-            Dense(1)  # Regression output
+            Dense(1)
     ])
 
     model.compile(optimizer=keras.optimizers.Adam(learning_rate=lr),
@@ -163,7 +160,6 @@ def plot_results(histories, prps):
     plt.legend(loc='upper right')
 
 
-    # Plot actual vs predicted
     data_list = []
     for i, (y_test, y_pred) in enumerate(prps):
         df_temp = pd.DataFrame({'Actual': y_test, 'Predicted': y_pred})
